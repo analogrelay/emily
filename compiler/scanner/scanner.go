@@ -1,32 +1,48 @@
-package tokenizer
+package scanner
 
 import (
 	"strconv"
 	"unicode"
 
+	"github.com/anurse/emily/compiler/token"
 	"github.com/pkg/errors"
 )
 
-var symbolMappings = map[rune]TokenKind{
-	'(': KindLParen,
-	')': KindRParen,
+var symbolMappings = map[rune]token.TokenKind{
+	'(': token.KindLParen,
+	')': token.KindRParen,
 }
 
-type TokenStream struct {
-	win window
+type Scanner struct {
+	win     window
+	current token.Token
 }
 
-func NewTokenStream(input string) *TokenStream {
-	return &TokenStream{newWindow(input)}
+func NewScanner(input string) *Scanner {
+	return &Scanner{newWindow(input), token.Token{}}
 }
 
-// Next returns the next token found in the reader, or an error if an I/O or parsing error occurs.
-//
-// When the end of the input stream is reached, a token of kind `KindNil`, and an `io.EOF` error are returned.
-func (t *TokenStream) Next() Token {
+func (t *Scanner) Token() token.Token {
+	return t.current
+}
+
+func (t *Scanner) Kind() token.TokenKind {
+	return t.current.Kind
+}
+
+func (t *Scanner) Err() error {
+	if t.current.Kind == token.KindError {
+		return t.current.Value.(error)
+	}
+	return nil
+}
+
+// Scan processes the next token in the stream, returning true if there is one and false if EOF has been reached
+func (t *Scanner) Scan() bool {
 	r := t.win.Next()
 	if r == 0 {
-		return t.emit(KindNil, nil)
+		t.current = token.Token{}
+		return false
 	}
 
 	p := t.win.Peek()
@@ -45,16 +61,16 @@ func (t *TokenStream) Next() Token {
 	case r == '+', r == '-', r == '.', isDigit(r):
 		return t.readDecimal(r == '.')
 	default:
-		return t.emit(KindError, errors.Errorf("unexpected %q", r))
+		return t.emit(token.KindError, errors.Errorf("unexpected %q", r))
 	}
 }
 
-func (t *TokenStream) readBlank() Token {
+func (t *Scanner) readBlank() bool {
 	t.win.TakeWhile(unicode.IsSpace)
-	return t.emit(KindBlank, nil)
+	return t.emit(token.KindBlank, nil)
 }
 
-func (t *TokenStream) readPrefixedInteger() Token {
+func (t *Scanner) readPrefixedInteger() bool {
 	switch t.win.Next() {
 	case 'o':
 		t.win.TakeWhile(isOctalDigit)
@@ -66,7 +82,7 @@ func (t *TokenStream) readPrefixedInteger() Token {
 	return t.emitInteger()
 }
 
-func (t *TokenStream) readDecimal(seenDot bool) Token {
+func (t *Scanner) readDecimal(seenDot bool) bool {
 	if !seenDot {
 		t.win.TakeWhile(isDigit)
 		seenDot = t.win.TakeIf('.')
@@ -85,34 +101,35 @@ func (t *TokenStream) readDecimal(seenDot bool) Token {
 		// Parse and return a float
 		val, err := strconv.ParseFloat(t.win.String(), 64)
 		if err != nil {
-			return t.emit(KindError, errors.Wrapf(err, "error parsing floating-point number"))
+			return t.emit(token.KindError, errors.Wrapf(err, "error parsing floating-point number"))
 		}
-		return t.emit(KindFloat, val)
+		return t.emit(token.KindFloat, val)
 	} else {
 		// Parse and return an integer
 		return t.emitInteger()
 	}
 }
 
-func (t *TokenStream) readIdent() Token {
+func (t *Scanner) readIdent() bool {
 	t.win.TakeWhile(isIdentPart)
-	return t.emit(KindIdent, t.win.String())
+	return t.emit(token.KindIdent, t.win.String())
 }
 
-func (t *TokenStream) emitInteger() Token {
+func (t *Scanner) emitInteger() bool {
 	// Parse and return
 	val, err := strconv.ParseInt(t.win.String(), 0, 64)
 	if err != nil {
-		return t.emit(KindError, errors.Wrapf(err, "error parsing integer"))
+		return t.emit(token.KindError, errors.Wrapf(err, "error parsing integer"))
 	}
-	return t.emit(KindInteger, val)
+	return t.emit(token.KindInteger, val)
 }
 
 // emit creates a new token using the current start/end value and resets them
-func (t *TokenStream) emit(kind TokenKind, value interface{}) Token {
+func (t *Scanner) emit(kind token.TokenKind, value interface{}) bool {
 	start, end := t.win.Advance()
-	tok := NewToken(kind, Position(start), Position(end), value)
-	return tok
+	tok := token.NewToken(kind, token.Position(start), token.Position(end), value)
+	t.current = tok
+	return true
 }
 
 func isDigit(r rune) bool {
