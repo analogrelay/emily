@@ -7,6 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var symbolMappings = map[rune]TokenKind{
+	'(': KindLParen,
+	')': KindRParen,
+}
+
 type TokenStream struct {
 	win window
 }
@@ -26,6 +31,10 @@ func (t *TokenStream) Next() Token {
 
 	p := t.win.Peek()
 
+	if kind, ok := symbolMappings[r]; ok {
+		return t.emit(kind, nil)
+	}
+
 	switch {
 	case isIdentStart(r):
 		return t.readIdent()
@@ -36,7 +45,7 @@ func (t *TokenStream) Next() Token {
 	case r == '+', r == '-', r == '.', isDigit(r):
 		return t.readDecimal(r == '.')
 	default:
-		return t.emit(KindError, errors.Errorf("unexpected '%q'", r))
+		return t.emit(KindError, errors.Errorf("unexpected %q", r))
 	}
 }
 

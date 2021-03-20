@@ -14,6 +14,8 @@ var (
 	KindInteger = TokenKind{2}
 	KindFloat   = TokenKind{3}
 	KindIdent   = TokenKind{4}
+	KindLParen  = TokenKind{5}
+	KindRParen  = TokenKind{6}
 
 	KindError = TokenKind{math.MaxInt32}
 )
@@ -24,6 +26,8 @@ var kindNames []string = []string{
 	"KindInteger",
 	"KindFloat",
 	"KindIdent",
+	"KindLParen",
+	"KindRParen",
 }
 
 func (k TokenKind) String() string {

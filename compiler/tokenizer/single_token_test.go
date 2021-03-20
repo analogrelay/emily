@@ -55,6 +55,11 @@ func TestIdentifier(t *testing.T) {
 	runLeadingTokenTest(t, "1cant_start_with_a_digit_though", "1", KindInteger, int64(1))
 }
 
+func TestSymbols(t *testing.T) {
+	runSingleTokenTest(t, "(", KindLParen, nil)
+	runSingleTokenTest(t, ")", KindRParen, nil)
+}
+
 func runSingleTokenTest(t *testing.T, input string, kind TokenKind, value interface{}) {
 	toks := runLeadingTokenTest(t, input, input, kind, value)
 
