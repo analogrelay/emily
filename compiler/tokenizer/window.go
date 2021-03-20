@@ -62,6 +62,18 @@ func (w *window) Take(n int) {
 	}
 }
 
+// TakeIf takes a rune into the window if it matches any of the provided rune and returns a boolean indicating if the rune was taken
+func (w *window) TakeIf(rs ...rune) bool {
+	p := w.Peek()
+	for _, r := range rs {
+		if p == r {
+			w.Take(1)
+			return true
+		}
+	}
+	return false
+}
+
 // TakeWhile takes runes into the window until either the end is reached, or the `fn` provided returns `false`
 func (w *window) TakeWhile(fn func(rune) bool) {
 	for {

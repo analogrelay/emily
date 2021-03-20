@@ -110,3 +110,16 @@ func TestTakeWhile(t *testing.T) {
 	require.Equal(t, "aaaaabbbb", win.String())
 	require.Equal(t, "", win.Rest())
 }
+
+func TestTakeIf(t *testing.T) {
+	win := newWindow("abcde")
+	require.True(t, win.TakeIf('a', 'e'))
+	require.Equal(t, "a", win.String())
+	require.Equal(t, "bcde", win.Rest())
+	require.False(t, win.TakeIf('c', 'd'))
+	require.Equal(t, "a", win.String())
+	require.Equal(t, "bcde", win.Rest())
+	require.True(t, win.TakeIf('e', 'b'))
+	require.Equal(t, "ab", win.String())
+	require.Equal(t, "cde", win.Rest())
+}

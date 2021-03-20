@@ -27,12 +27,14 @@ func (t *TokenStream) Next() Token {
 	p := t.win.Peek()
 
 	switch {
+	case isIdentStart(r):
+		return t.readIdent()
 	case unicode.IsSpace(r):
 		return t.readBlank()
 	case r == '0' && (p == 'o' || p == 'x' || p == 'b'):
 		return t.readPrefixedInteger()
-	case r == '+', r == '-', isDigit(r):
-		return t.readDecimal()
+	case r == '+', r == '-', r == '.', isDigit(r):
+		return t.readDecimal(r == '.')
 	default:
 		return t.emit(KindError, errors.Errorf("unexpected '%q'", r))
 	}
@@ -55,9 +57,37 @@ func (t *TokenStream) readPrefixedInteger() Token {
 	return t.emitInteger()
 }
 
-func (t *TokenStream) readDecimal() Token {
-	t.win.TakeWhile(isDigit)
-	return t.emitInteger()
+func (t *TokenStream) readDecimal(seenDot bool) Token {
+	if !seenDot {
+		t.win.TakeWhile(isDigit)
+		seenDot = t.win.TakeIf('.')
+	}
+
+	if seenDot {
+		t.win.TakeWhile(isDigit)
+	}
+
+	seenE := t.win.TakeIf('e', 'E')
+	if seenE {
+		t.win.TakeWhile(isDigit)
+	}
+
+	if seenE || seenDot {
+		// Parse and return a float
+		val, err := strconv.ParseFloat(t.win.String(), 64)
+		if err != nil {
+			return t.emit(KindError, errors.Wrapf(err, "error parsing floating-point number"))
+		}
+		return t.emit(KindFloat, val)
+	} else {
+		// Parse and return an integer
+		return t.emitInteger()
+	}
+}
+
+func (t *TokenStream) readIdent() Token {
+	t.win.TakeWhile(isIdentPart)
+	return t.emit(KindIdent, t.win.String())
 }
 
 func (t *TokenStream) emitInteger() Token {
@@ -90,4 +120,12 @@ func isOctalDigit(r rune) bool {
 
 func isBinaryDigit(r rune) bool {
 	return r == '0' || r == '1' || r == '_'
+}
+
+func isIdentStart(r rune) bool {
+	return r == '_' || unicode.IsLetter(r)
+}
+
+func isIdentPart(r rune) bool {
+	return isIdentStart(r) || unicode.IsDigit(r)
 }
